@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Template Logo Generátor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4">
+
+    <header class="text-center mb-6">
+        <h1 class="text-2xl md:text-3xl font-black tracking-wider bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
+            TEMPLATE LOGO GENERÁTOR
+        </h1>
+        <p class="text-slate-400 text-sm mt-1">Generuje loga na základě tvého template s dynamickou změnou barvy a ikony.</p>
+    </header>
+
+    <main class="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+
+        <div class="flex flex-col space-y-5">
+            <div>
+                <label for="categorySelect" class="block text-sm font-semibold text-slate-300 mb-2">
+                    <i class="fa-solid fa-layer-group mr-2 text-amber-400"></i> Vyberte kategorii / barvu:
+                </label>
+                <select id="categorySelect" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-amber-500 transition">
+                    <option value="technician" data-color="#94a3b8">Technik / Údržba (Šedá)</option>
+                    <option value="train" data-color="#38bdf8">Vlakový technik (Modrá)</option>
+                    <option value="electrician" data-color="#facc15">Elektrikář (Zlatá / Žlutá)</option>
+                    <option value="it" data-color="#4ade80">IT & Kybernetika (Zelená)</option>
+                    <option value="chef" data-color="#f87171">Gastronomie / Kuchař (Červená)</option>
+                    <option value="security" data-color="#c084fc">Bezpečnost (Fialová)</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="customText" class="block text-sm font-semibold text-slate-300 mb-2">
+                    <i class="fa-solid fa-font mr-2 text-amber-400"></i> Vlastní text pod znakem:
+                </label>
+                <input type="text" id="customText" placeholder="např. TECHNIK" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-amber-500 transition">
+            </div>
+
+            <div class="pt-2 flex flex-col gap-3">
+                <button id="downloadBtn" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold py-3 px-4 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-download"></i> Stáhnout jako PNG obrázek
+                </button>
+                <p id="statusMsg" class="text-xs text-emerald-400 text-center">Šablona je úspěšně připravena k použití.</p>
+            </div>
+        </div>
+
+        <div class="flex flex-col items-center justify-center bg-slate-950/60 border border-slate-800/80 rounded-2xl p-6 relative">
+            <div id="previewWrapper" class="w-64 h-64 flex items-center justify-center relative">
+                <!-- Plátno kde probíhá obarvení a skládání ikony -->
+                <canvas id="previewCanvas" width="400" height="400" class="w-full h-full object-contain drop-shadow-lg"></canvas>
+            </div>
+            <div id="previewTextLabel" class="mt-4 font-black tracking-widest text-lg text-slate-200">TECHNIK</div>
+        </div>
+
+    </main>
+
+    <script>
+        const categories = {
+            technician: { name: "TECHNIK", iconUnicode: "\uf013", color: "#94a3b8" }, // gear
+            train: { name: "VLAKOVÝ TECHNIK", iconUnicode: "\uf238", color: "#38bdf8" }, // train
+            electrician: { name: "ELEKTRIKÁŘ", iconUnicode: "\uf0e7", color: "#facc15" }, // bolt
+            it: { name: "IT SPEZIALIST", iconUnicode: "\uf2db", color: "#4ade80" }, // microchip
+            chef: { name: "KUCHAŘ / GASTRO", iconUnicode: "\uf2e7", color: "#f87171" }, // utensils
+            security: { name: "BEZPEČNOST", iconUnicode: "\uf3ed", color: "#c084fc" }  // shield
+        };
+
+        const categorySelect = document.getElementById('categorySelect');
+        const customText = document.getElementById('customText');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const previewTextLabel = document.getElementById('previewTextLabel');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const statusMsg = document.getElementById('statusMsg');
+
+        // Vložený originální template jako Base64 řetězec, aby se obešla CORS politika prohlížečů
+        const templateDataUri = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAGQAQMAAAC6caSPAAAAA1BMVEUAAACp3taCAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAWElEQVR4nO3BMQEAAADCoPVPbQwfoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIC3AcD8AAE5k0+qAAAAAElFTkSuQmCC";
+        
+        const sourceImage = new Image();
+        sourceImage.crossOrigin = "anonymous";
+
+        function redrawCanvas() {
+            const ctx = previewCanvas.getContext('2d');
+            ctx.clearRect(0, 0, 400, 400);
+
+            const selectedKey = categorySelect.value;
+            const config = categories[selectedKey];
+            const activeColor = config.color;
+
+            if (sourceImage.complete && sourceImage.naturalHeight !== 0) {
+                // 1. Vykreslení template obrázku
+                ctx.drawImage(sourceImage, 0, 0, 400, 400);
+                
+                // 2. Přebarvení template do zvolené barvy kategorie
+                ctx.globalCompositeOperation = 'source-atop';
+                ctx.fillStyle = activeColor;
+                ctx.fillRect(0, 0, 400, 400);
+                ctx.globalCompositeOperation = 'source-over';
+            }
+
+            // 3. Vykreslení ikony doprostřed znaku
+            ctx.save();
+            ctx.fillStyle = "#ffffff";
+            ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
+            ctx.shadowBlur = 10;
+            ctx.font = "bold 90px 'Font Awesome 6 Free', sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(config.iconUnicode, 200, 195);
+            ctx.restore();
+
+            // 4. Aktualizace spodního textového popisku
+            const textValue = customText.value.trim() !== '' ? customText.value.toUpperCase() : config.name;
+            previewTextLabel.textContent = textValue;
+        }
+
+        categorySelect.addEventListener('change', () => {
+            customText.value = '';
+            redrawCanvas();
+        });
+
+        customText.addEventListener('input', redrawCanvas);
+
+        downloadBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = `logo-${categorySelect.value}.png`;
+            link.href = previewCanvas.toDataURL('image/png');
+            link.click();
+        });
+
+        sourceImage.onload = function() {
+            redrawCanvas();
+        };
+
+        // Spuštění načtení vestavěného template
+        sourceImage.src = templateDataUri;
+    </script>
+</body>
+</html>
